@@ -23,7 +23,13 @@ mongoose
 const app = express();
 
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:5173'],
+  origin: [
+    'http://localhost:3000', 
+    'http://localhost:5173', 
+    'https://v-cart-rho.vercel.app', 
+    'https://v-cart-git-main-vividhdesigns-projects.vercel.app', 
+    'https://v-cart-6b01m9vrn-vividhdesigns-projects.vercel.app'
+  ],
   credentials: true,
 }));
 
