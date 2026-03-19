@@ -1,73 +1,81 @@
-import Axios from 'axios';
-import React, { useContext, useEffect, useReducer } from 'react';
-import { Helmet } from 'react-helmet-async';
+import { useContext, useEffect, useReducer } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import Row from 'react-bootstrap/Row';
-import Col from 'react-bootstrap/Col';
-import Card from 'react-bootstrap/Card';
-import Button from 'react-bootstrap/Button';
-import ListGroup from 'react-bootstrap/ListGroup';
+import axios from 'axios';
 import { toast } from 'react-toastify';
-import { getError } from '../utils';
 import { Store } from '../Store';
-import CheckoutSteps from '../components/CheckoutSteps';
+import { getError } from '../utils';
 import LoadingBox from '../components/LoadingBox';
+import MessageBox from '../components/MessageBox';
+
+function CheckoutSteps({ step1, step2, step3, step4 }) {
+  const steps = [
+    { label: 'Sign In', done: true },
+    { label: 'Shipping', done: true },
+    { label: 'Payment', done: true },
+    { label: 'Place Order', active: true },
+  ];
+  return (
+    <div className="checkout-steps" style={{ marginBottom: 32 }}>
+      {steps.map((step, i) => (
+        <div key={step.label} style={{ display: 'flex', alignItems: 'center' }}>
+          <div className={`step${step.done ? ' done' : step.active ? ' active' : ''}`}>
+            <div className="step-circle">
+              {step.done ? <i className="fas fa-check" style={{ fontSize: '0.7rem' }}></i> : i + 1}
+            </div>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{step.label}</span>
+          </div>
+          {i < steps.length - 1 && (
+            <div className="step-connector" style={{ background: step.done ? 'var(--success)' : 'var(--border)' }}></div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const reducer = (state, action) => {
   switch (action.type) {
-    case 'CREATE_REQUEST':
-      return { ...state, loading: true };
-    case 'CREATE_SUCCESS':
-      return { ...state, loading: false };
-    case 'CREATE_FAIL':
-      return { ...state, loading: false };
-    default:
-      return state;
+    case 'CREATE_REQUEST': return { ...state, loading: true };
+    case 'CREATE_SUCCESS': return { ...state, loading: false };
+    case 'CREATE_FAIL': return { ...state, loading: false };
+    default: return state;
   }
 };
 
 export default function PlaceOrderScreen() {
   const navigate = useNavigate();
-
-  const [{ loading }, dispatch] = useReducer(reducer, {
-    loading: false,
-  });
-
+  const [{ loading }, dispatch] = useReducer(reducer, { loading: false });
   const { state, dispatch: ctxDispatch } = useContext(Store);
   const { cart, userInfo } = state;
 
-  const round2 = (num) => Math.round(num * 100 + Number.EPSILON) / 100; // 123.2345 => 123.23
-  cart.itemsPrice = round2(
-    cart.cartItems.reduce((a, c) => a + c.quantity * c.price, 0)
-  );
-  cart.shippingPrice = cart.itemsPrice > 100 ? round2(0) : round2(10);
-  cart.taxPrice = round2(0.15 * cart.itemsPrice);
-  cart.totalPrice = cart.itemsPrice + cart.shippingPrice + cart.taxPrice;
+  const round2 = (num) => Math.round(num * 100 + Number.EPSILON) / 100;
+  const itemsPrice = round2(cart.cartItems.reduce((a, c) => a + c.quantity * c.price, 0));
+  const shippingPrice = itemsPrice > 100 ? round2(0) : round2(10);
+  const taxPrice = round2(0.18 * itemsPrice);
+  const totalPrice = itemsPrice + shippingPrice + taxPrice;
+
+  useEffect(() => {
+    if (!cart.paymentMethod) navigate('/payment');
+  }, [cart, navigate]);
 
   const placeOrderHandler = async () => {
+    dispatch({ type: 'CREATE_REQUEST' });
     try {
-      dispatch({ type: 'CREATE_REQUEST' });
-
-      const { data } = await Axios.post(
+      const { data } = await axios.post(
         '/api/orders',
         {
           orderItems: cart.cartItems,
           shippingAddress: cart.shippingAddress,
           paymentMethod: cart.paymentMethod,
-          itemsPrice: cart.itemsPrice,
-          shippingPrice: cart.shippingPrice,
-          taxPrice: cart.taxPrice,
-          totalPrice: cart.totalPrice,
+          itemsPrice,
+          shippingPrice,
+          taxPrice,
+          totalPrice,
         },
-        {
-          headers: {
-            authorization: `Bearer ${userInfo.token}`,
-          },
-        }
+        { headers: { authorization: `Bearer ${userInfo.token}` } }
       );
       ctxDispatch({ type: 'CART_CLEAR' });
       dispatch({ type: 'CREATE_SUCCESS' });
-      localStorage.removeItem('cartItems');
       navigate(`/order/${data.order._id}`);
     } catch (err) {
       dispatch({ type: 'CREATE_FAIL' });
@@ -75,121 +83,70 @@ export default function PlaceOrderScreen() {
     }
   };
 
-  useEffect(() => {
-    if (!cart.paymentMethod) {
-      navigate('/payment');
-    }
-  }, [cart, navigate]);
-
   return (
-    <div>
-      <CheckoutSteps step1 step2 step3 step4></CheckoutSteps>
-      <Helmet>
-        <title>Preview Order</title>
-      </Helmet>
-      <h1 className="my-3">Preview Order</h1>
-      <Row>
-        <Col md={8}>
-          <Card className="mb-3">
-            <Card.Body>
-              <Card.Title>Shipping</Card.Title>
-              <Card.Text>
-                <strong>Name:</strong> {cart.shippingAddress.fullName} <br />
-                <strong>Address: </strong> {cart.shippingAddress.address},
-                {cart.shippingAddress.city}, {cart.shippingAddress.postalCode},
-                {cart.shippingAddress.country}
-              </Card.Text>
-              <Link to="/shipping">Edit</Link>
-            </Card.Body>
-          </Card>
+    <div style={{ padding: '28px 0' }}>
+      <CheckoutSteps step1 step2 step3 step4 />
+      <h1 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: 28 }}>Review Your Order</h1>
 
-          <Card className="mb-3">
-            <Card.Body>
-              <Card.Title>Payment</Card.Title>
-              <Card.Text>
-                <strong>Method:</strong> {cart.paymentMethod}
-              </Card.Text>
-              <Link to="/payment">Edit</Link>
-            </Card.Body>
-          </Card>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24, alignItems: 'start' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Shipping */}
+          <div className="card card-body">
+            <h3 style={{ fontWeight: 700, marginBottom: 12, fontSize: '1rem' }}>📦 Shipping Address</h3>
+            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.8 }}>
+              {cart.shippingAddress.fullName}<br />
+              {cart.shippingAddress.address}<br />
+              {cart.shippingAddress.city}, {cart.shippingAddress.postalCode}<br />
+              {cart.shippingAddress.country}
+            </p>
+            <Link to="/shipping" style={{ fontSize: '0.8rem', color: 'var(--accent-secondary)', textDecoration: 'none', marginTop: 8, display: 'inline-block' }}>
+              ✏️ Edit
+            </Link>
+          </div>
 
-          <Card className="mb-3">
-            <Card.Body>
-              <Card.Title>Items</Card.Title>
-              <ListGroup variant="flush">
-                {cart.cartItems.map((item) => (
-                  <ListGroup.Item key={item._id}>
-                    <Row className="align-items-center">
-                      <Col md={6}>
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="img-fluid rounded img-thumbnail"
-                        ></img>{' '}
-                        <Link to={`/product/${item.slug}`}>{item.name}</Link>
-                      </Col>
-                      <Col md={3}>
-                        <span>{item.quantity}</span>
-                      </Col>
-                      <Col md={3}>${item.price}</Col>
-                    </Row>
-                  </ListGroup.Item>
-                ))}
-              </ListGroup>
-              <Link to="/cart">Edit</Link>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col md={4}>
-          <Card>
-            <Card.Body>
-              <Card.Title>Order Summary</Card.Title>
-              <ListGroup variant="flush">
-                <ListGroup.Item>
-                  <Row>
-                    <Col>Items</Col>
-                    <Col>${cart.itemsPrice.toFixed(2)}</Col>
-                  </Row>
-                </ListGroup.Item>
-                <ListGroup.Item>
-                  <Row>
-                    <Col>Shipping</Col>
-                    <Col>${cart.shippingPrice.toFixed(2)}</Col>
-                  </Row>
-                </ListGroup.Item>
-                <ListGroup.Item>
-                  <Row>
-                    <Col>Tax</Col>
-                    <Col>${cart.taxPrice.toFixed(2)}</Col>
-                  </Row>
-                </ListGroup.Item>
-                <ListGroup.Item>
-                  <Row>
-                    <Col>
-                      <strong> Order Total</strong>
-                    </Col>
-                    <Col>
-                      <strong>${cart.totalPrice.toFixed(2)}</strong>
-                    </Col>
-                  </Row>
-                </ListGroup.Item>
-                <ListGroup.Item>
-                  <div className="d-grid">
-                    <Button
-                      type="button"
-                      onClick={placeOrderHandler}
-                      disabled={cart.cartItems.length === 0}
-                    >
-                      Place Order
-                    </Button>
-                  </div>
-                  {loading && <LoadingBox></LoadingBox>}
-                </ListGroup.Item>
-              </ListGroup>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+          {/* Payment */}
+          <div className="card card-body">
+            <h3 style={{ fontWeight: 700, marginBottom: 12, fontSize: '1rem' }}>💳 Payment Method</h3>
+            <p style={{ color: 'var(--text-secondary)' }}>{cart.paymentMethod}</p>
+            <Link to="/payment" style={{ fontSize: '0.8rem', color: 'var(--accent-secondary)', textDecoration: 'none', marginTop: 8, display: 'inline-block' }}>
+              ✏️ Edit
+            </Link>
+          </div>
+
+          {/* Items */}
+          <div className="card card-body">
+            <h3 style={{ fontWeight: 700, marginBottom: 12, fontSize: '1rem' }}>🛒 Order Items</h3>
+            {cart.cartItems.map((item) => (
+              <div key={item._id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                <img src={item.image} alt={item.name} style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 8, background: 'var(--bg-secondary)' }} />
+                <div style={{ flex: 1 }}>
+                  <Link to={`/product/${item.slug}`} style={{ fontWeight: 500, color: 'var(--text-primary)', textDecoration: 'none', fontSize: '0.875rem' }}>{item.name}</Link>
+                </div>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{item.quantity} × ${item.price.toFixed(2)}</span>
+                <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>${(item.quantity * item.price).toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Summary */}
+        <div className="summary-card">
+          <h3 className="summary-title">Order Summary</h3>
+          <div className="summary-row"><span>Items</span><span>${itemsPrice.toFixed(2)}</span></div>
+          <div className="summary-row"><span>Shipping</span><span>{shippingPrice === 0 ? <span style={{ color: 'var(--success)' }}>FREE</span> : `$${shippingPrice.toFixed(2)}`}</span></div>
+          <div className="summary-row"><span>Tax (18%)</span><span>${taxPrice.toFixed(2)}</span></div>
+          <div className="summary-row total"><span>Total</span><span>${totalPrice.toFixed(2)}</span></div>
+          <button
+            className="btn btn-primary"
+            style={{ width: '100%', justifyContent: 'center', marginTop: 16 }}
+            onClick={placeOrderHandler}
+            disabled={loading || cart.cartItems.length === 0}
+            id="place-order-btn"
+          >
+            {loading ? <><i className="fas fa-spinner fa-spin"></i> Placing...</> : <><i className="fas fa-check-circle"></i> Place Order</>}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

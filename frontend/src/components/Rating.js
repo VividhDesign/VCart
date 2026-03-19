@@ -1,68 +1,27 @@
-function Rating(props) {
-  const { rating, numReviews, caption } = props;
+export default function Rating({ rating, numReviews, caption }) {
+  const stars = [1, 2, 3, 4, 5];
   return (
     <div className="rating">
-      <span>
-        <i
-          className={
-            rating >= 1
-              ? 'fas fa-star'
-              : rating >= 0.5
-              ? 'fas fa-star-half-alt'
-              : 'far fa-star'
-          }
-        />
-      </span>
-      <span>
-        <i
-          className={
-            rating >= 2
-              ? 'fas fa-star'
-              : rating >= 1.5
-              ? 'fas fa-star-half-alt'
-              : 'far fa-star'
-          }
-        />
-      </span>
-      <span>
-        <i
-          className={
-            rating >= 3
-              ? 'fas fa-star'
-              : rating >= 2.5
-              ? 'fas fa-star-half-alt'
-              : 'far fa-star'
-          }
-        />
-      </span>
-      <span>
-        <i
-          className={
-            rating >= 4
-              ? 'fas fa-star'
-              : rating >= 3.5
-              ? 'fas fa-star-half-alt'
-              : 'far fa-star'
-          }
-        />
-      </span>
-      <span>
-        <i
-          className={
-            rating >= 5
-              ? 'fas fa-star'
-              : rating >= 4.5
-              ? 'fas fa-star-half-alt'
-              : 'far fa-star'
-          }
-        />
-      </span>
-      {caption ? (
-        <span>{caption}</span>
-      ) : (
-        <span>{' ' + numReviews + ' reviews'}</span>
+      <div className="rating-stars">
+        {stars.map((s) => (
+          <i
+            key={s}
+            className={
+              rating >= s
+                ? 'fas fa-star star-filled'
+                : rating >= s - 0.5
+                ? 'fas fa-star-half-alt star-half'
+                : 'far fa-star star-empty'
+            }
+            style={{ fontSize: '0.8rem' }}
+          />
+        ))}
+      </div>
+      {numReviews !== undefined && (
+        <span className="rating-count">
+          {caption || `(${numReviews})`}
+        </span>
       )}
     </div>
   );
 }
-export default Rating;

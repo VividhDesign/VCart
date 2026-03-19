@@ -1,76 +1,52 @@
-import Axios from 'axios';
-import { useContext, useEffect, useState } from 'react';
-import Container from 'react-bootstrap/Container';
-import Button from 'react-bootstrap/Button';
-import Form from 'react-bootstrap/Form';
-import { Helmet } from 'react-helmet-async';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { toast } from 'react-toastify';
-import { Store } from '../Store';
 import { getError } from '../utils';
 
 export default function ResetPasswordScreen() {
-  const navigate = useNavigate();
   const { token } = useParams();
-
+  const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-
-  const { state } = useContext(Store);
-  const { userInfo } = state;
-
-  useEffect(() => {
-    if (userInfo || !token) {
-      navigate('/');
-    }
-  }, [navigate, userInfo, token]);
+  const [loading, setLoading] = useState(false);
 
   const submitHandler = async (e) => {
     e.preventDefault();
-    if (password !== confirmPassword) {
-      toast.error('Passwords do not match');
-      return;
-    }
+    if (password !== confirmPassword) { toast.error('Passwords do not match'); return; }
+    setLoading(true);
     try {
-      await Axios.post('/api/users/reset-password', {
-        password,
-        token,
-      });
+      await axios.post('/api/users/reset-password', { token, password });
+      toast.success('Password reset successfully!');
       navigate('/signin');
-      toast.success('Password updated successfully');
     } catch (err) {
       toast.error(getError(err));
     }
+    setLoading(false);
   };
 
   return (
-    <Container className="small-container">
-      <Helmet>
-        <title>Reset Password</title>
-      </Helmet>
-      <h1 className="my-3">Reset Password</h1>
-      <Form onSubmit={submitHandler}>
-        <Form.Group className="mb-3" controlId="password">
-          <Form.Label>New Password</Form.Label>
-          <Form.Control
-            type="password"
-            required
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </Form.Group>
-        <Form.Group className="mb-3" controlId="confirmPassword">
-          <Form.Label>Confirm New Password</Form.Label>
-          <Form.Control
-            type="password"
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-          />
-        </Form.Group>
-
-        <div className="mb-3">
-          <Button type="submit">Reset Password</Button>
+    <div className="form-container">
+      <div className="form-card">
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>🔑</div>
+          <h1 className="form-title">Reset Password</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Choose a strong new password</p>
         </div>
-      </Form>
-    </Container>
+        <form onSubmit={submitHandler}>
+          <div className="form-group">
+            <label className="form-label">New Password</label>
+            <input type="password" className="form-control" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="Min. 6 characters" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Confirm Password</label>
+            <input type="password" className="form-control" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required placeholder="Repeat password" />
+          </div>
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={loading} id="reset-password-btn">
+            {loading ? 'Resetting...' : <><i className="fas fa-check"></i> Reset Password</>}
+          </button>
+        </form>
+      </div>
+    </div>
   );
 }

@@ -1,12 +1,8 @@
-import Axios from 'axios';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import Container from 'react-bootstrap/Container';
-import Form from 'react-bootstrap/Form';
-import Button from 'react-bootstrap/Button';
-import { Helmet } from 'react-helmet-async';
 import { useContext, useEffect, useState } from 'react';
-import { Store } from '../Store';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { toast } from 'react-toastify';
+import { Store } from '../Store';
 import { getError } from '../utils';
 
 export default function SigninScreen() {
@@ -17,64 +13,82 @@ export default function SigninScreen() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const { state, dispatch: ctxDispatch } = useContext(Store);
   const { userInfo } = state;
+
   const submitHandler = async (e) => {
     e.preventDefault();
+    setLoading(true);
     try {
-      const { data } = await Axios.post('/api/users/signin', {
-        email,
-        password,
-      });
+      const { data } = await axios.post('/api/users/signin', { email, password });
       ctxDispatch({ type: 'USER_SIGNIN', payload: data });
-      localStorage.setItem('userInfo', JSON.stringify(data));
       navigate(redirect || '/');
     } catch (err) {
       toast.error(getError(err));
     }
+    setLoading(false);
   };
 
   useEffect(() => {
-    if (userInfo) {
-      navigate(redirect);
-    }
+    if (userInfo) navigate(redirect);
   }, [navigate, redirect, userInfo]);
 
   return (
-    <Container className="small-container">
-      <Helmet>
-        <title>Sign In</title>
-      </Helmet>
-      <h1 className="my-3">Sign In</h1>
-      <Form onSubmit={submitHandler}>
-        <Form.Group className="mb-3" controlId="email">
-          <Form.Label>Email</Form.Label>
-          <Form.Control
-            type="email"
-            required
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </Form.Group>
-        <Form.Group className="mb-3" controlId="password">
-          <Form.Label>Password</Form.Label>
-          <Form.Control
-            type="password"
-            required
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </Form.Group>
-        <div className="mb-3">
-          <Button type="submit">Sign In</Button>
+    <div className="form-container">
+      <div className="form-card">
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>⚡</div>
+          <h1 className="form-title">Welcome Back</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Sign in to your VCart account</p>
         </div>
-        <div className="mb-3">
-          New customer?{' '}
-          <Link to={`/signup?redirect=${redirect}`}>Create your account</Link>
-        </div>
-        <div className="mb-3">
-          Forget Password? <Link to={`/forget-password`}>Reset Password</Link>
-        </div>
-      </Form>
-    </Container>
+
+        <form onSubmit={submitHandler}>
+          <div className="form-group">
+            <label className="form-label" htmlFor="email">Email Address</label>
+            <input
+              id="email"
+              type="email"
+              className="form-control"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              className="form-control"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+            />
+          </div>
+          <div style={{ textAlign: 'right', marginBottom: 20, marginTop: -12 }}>
+            <Link to="/forget-password" style={{ fontSize: '0.8rem', color: 'var(--accent-secondary)', textDecoration: 'none' }}>
+              Forgot password?
+            </Link>
+          </div>
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={loading} id="signin-btn">
+            {loading ? <><i className="fas fa-spinner fa-spin"></i> Signing in...</> : <><i className="fas fa-sign-in-alt"></i> Sign In</>}
+          </button>
+        </form>
+
+        <hr className="divider" />
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+          New to VCart?{' '}
+          <Link to={`/signup?redirect=${redirect}`} style={{ color: 'var(--accent-secondary)', fontWeight: 600, textDecoration: 'none' }}>
+            Create an account
+          </Link>
+        </p>
+      </div>
+    </div>
   );
 }

@@ -1,12 +1,8 @@
-import Axios from 'axios';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import Container from 'react-bootstrap/Container';
-import Form from 'react-bootstrap/Form';
-import Button from 'react-bootstrap/Button';
-import { Helmet } from 'react-helmet-async';
 import { useContext, useEffect, useState } from 'react';
-import { Store } from '../Store';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { toast } from 'react-toastify';
+import { Store } from '../Store';
 import { getError } from '../utils';
 
 export default function SignupScreen() {
@@ -19,79 +15,72 @@ export default function SignupScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const { state, dispatch: ctxDispatch } = useContext(Store);
   const { userInfo } = state;
+
   const submitHandler = async (e) => {
     e.preventDefault();
     if (password !== confirmPassword) {
       toast.error('Passwords do not match');
       return;
     }
+    setLoading(true);
     try {
-      const { data } = await Axios.post('/api/users/signup', {
-        name,
-        email,
-        password,
-      });
+      const { data } = await axios.post('/api/users/signup', { name, email, password });
       ctxDispatch({ type: 'USER_SIGNIN', payload: data });
-      localStorage.setItem('userInfo', JSON.stringify(data));
       navigate(redirect || '/');
+      toast.success('Account created successfully!');
     } catch (err) {
       toast.error(getError(err));
     }
+    setLoading(false);
   };
 
   useEffect(() => {
-    if (userInfo) {
-      navigate(redirect);
-    }
+    if (userInfo) navigate(redirect);
   }, [navigate, redirect, userInfo]);
 
   return (
-    <Container className="small-container">
-      <Helmet>
-        <title>Sign Up</title>
-      </Helmet>
-      <h1 className="my-3">Sign Up</h1>
-      <Form onSubmit={submitHandler}>
-        <Form.Group className="mb-3" controlId="name">
-          <Form.Label>Name</Form.Label>
-          <Form.Control onChange={(e) => setName(e.target.value)} required />
-        </Form.Group>
+    <div className="form-container">
+      <div className="form-card">
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>🚀</div>
+          <h1 className="form-title">Create Account</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Join thousands of VCart shoppers</p>
+        </div>
 
-        <Form.Group className="mb-3" controlId="email">
-          <Form.Label>Email</Form.Label>
-          <Form.Control
-            type="email"
-            required
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </Form.Group>
-        <Form.Group className="mb-3" controlId="password">
-          <Form.Label>Password</Form.Label>
-          <Form.Control
-            type="password"
-            required
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <Form.Group className="mb-3" controlId="confirmPassword">
-            <Form.Label>Confirm Password</Form.Label>
-            <Form.Control
-              type="password"
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-            />
-          </Form.Group>
-        </Form.Group>
-        <div className="mb-3">
-          <Button type="submit">Sign Up</Button>
-        </div>
-        <div className="mb-3">
+        <form onSubmit={submitHandler}>
+          <div className="form-group">
+            <label className="form-label" htmlFor="name">Full Name</label>
+            <input id="name" type="text" className="form-control" placeholder="John Doe" value={name} onChange={(e) => setName(e.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="email">Email Address</label>
+            <input id="email" type="email" className="form-control" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="password">Password</label>
+            <input id="password" type="password" className="form-control" placeholder="Min. 6 characters" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="confirm-password">Confirm Password</label>
+            <input id="confirm-password" type="password" className="form-control" placeholder="Repeat password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+          </div>
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 4 }} disabled={loading} id="signup-btn">
+            {loading ? <><i className="fas fa-spinner fa-spin"></i> Creating account...</> : <><i className="fas fa-user-plus"></i> Create Account</>}
+          </button>
+        </form>
+
+        <hr className="divider" />
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
           Already have an account?{' '}
-          <Link to={`/signin?redirect=${redirect}`}>Sign-In</Link>
-        </div>
-      </Form>
-    </Container>
+          <Link to={`/signin?redirect=${redirect}`} style={{ color: 'var(--accent-secondary)', fontWeight: 600, textDecoration: 'none' }}>
+            Sign in
+          </Link>
+        </p>
+      </div>
+    </div>
   );
 }

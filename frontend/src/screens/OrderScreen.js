@@ -1,338 +1,168 @@
+import { useContext, useEffect, useReducer } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
-import React, { useContext, useEffect, useReducer } from 'react';
-import { PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
-import { Helmet } from 'react-helmet-async';
-import { useNavigate, useParams } from 'react-router-dom';
-import Row from 'react-bootstrap/Row';
-import Col from 'react-bootstrap/Col';
-import Button from 'react-bootstrap/Button';
-import ListGroup from 'react-bootstrap/ListGroup';
-import Card from 'react-bootstrap/Card';
-import { Link } from 'react-router-dom';
-import LoadingBox from '../components/LoadingBox';
-import MessageBox from '../components/MessageBox';
+import { toast } from 'react-toastify';
 import { Store } from '../Store';
 import { getError } from '../utils';
-import { toast } from 'react-toastify';
+import LoadingBox from '../components/LoadingBox';
+import MessageBox from '../components/MessageBox';
 
-function reducer(state, action) {
+const reducer = (state, action) => {
   switch (action.type) {
-    case 'FETCH_REQUEST':
-      return { ...state, loading: true, error: '' };
-    case 'FETCH_SUCCESS':
-      return { ...state, loading: false, order: action.payload, error: '' };
-    case 'FETCH_FAIL':
-      return { ...state, loading: false, error: action.payload };
-    case 'PAY_REQUEST':
-      return { ...state, loadingPay: true };
-    case 'PAY_SUCCESS':
-      return { ...state, loadingPay: false, successPay: true };
-    case 'PAY_FAIL':
-      return { ...state, loadingPay: false };
-    case 'PAY_RESET':
-      return { ...state, loadingPay: false, successPay: false };
-
-    case 'DELIVER_REQUEST':
-      return { ...state, loadingDeliver: true };
-    case 'DELIVER_SUCCESS':
-      return { ...state, loadingDeliver: false, successDeliver: true };
-    case 'DELIVER_FAIL':
-      return { ...state, loadingDeliver: false };
-    case 'DELIVER_RESET':
-      return {
-        ...state,
-        loadingDeliver: false,
-        successDeliver: false,
-      };
-    default:
-      return state;
+    case 'FETCH_REQUEST': return { ...state, loading: true, error: '' };
+    case 'FETCH_SUCCESS': return { ...state, order: action.payload, loading: false };
+    case 'FETCH_FAIL': return { ...state, loading: false, error: action.payload };
+    case 'PAY_REQUEST': return { ...state, loadingPay: true };
+    case 'PAY_SUCCESS': return { ...state, loadingPay: false, successPay: true };
+    case 'PAY_FAIL': return { ...state, loadingPay: false };
+    case 'PAY_RESET': return { ...state, loadingPay: false, successPay: false };
+    case 'DELIVER_REQUEST': return { ...state, loadingDeliver: true };
+    case 'DELIVER_SUCCESS': return { ...state, loadingDeliver: false, successDeliver: true };
+    case 'DELIVER_FAIL': return { ...state, loadingDeliver: false };
+    case 'DELIVER_RESET': return { ...state, loadingDeliver: false, successDeliver: false };
+    default: return state;
   }
-}
+};
+
 export default function OrderScreen() {
+  const { id: orderId } = useParams();
+  const navigate = useNavigate();
   const { state } = useContext(Store);
   const { userInfo } = state;
+  const [{ loading, error, order, successPay, loadingPay, loadingDeliver, successDeliver }, dispatch] =
+    useReducer(reducer, { loading: true, order: {}, error: '', successPay: false, loadingPay: false, loadingDeliver: false, successDeliver: false });
 
-  const params = useParams();
-  const { id: orderId } = params;
-  const navigate = useNavigate();
-
-  const [
-    {
-      loading,
-      error,
-      order,
-      successPay,
-      loadingPay,
-      loadingDeliver,
-      successDeliver,
-    },
-    dispatch,
-  ] = useReducer(reducer, {
-    loading: true,
-    order: {},
-    error: '',
-    successPay: false,
-    loadingPay: false,
-  });
-
-  const [{ isPending }, paypalDispatch] = usePayPalScriptReducer();
-
-  function createOrder(data, actions) {
-    return actions.order
-      .create({
-        purchase_units: [
-          {
-            amount: { value: order.totalPrice },
-          },
-        ],
-      })
-      .then((orderID) => {
-        return orderID;
+  const fetchOrder = async () => {
+    dispatch({ type: 'FETCH_REQUEST' });
+    try {
+      const { data } = await axios.get(`/api/orders/${orderId}`, {
+        headers: { authorization: `Bearer ${userInfo.token}` },
       });
-  }
-
-  function onApprove(data, actions) {
-    return actions.order.capture().then(async function (details) {
-      try {
-        dispatch({ type: 'PAY_REQUEST' });
-        const { data } = await axios.put(
-          `/api/orders/${order._id}/pay`,
-          details,
-          {
-            headers: { authorization: `Bearer ${userInfo.token}` },
-          }
-        );
-        dispatch({ type: 'PAY_SUCCESS', payload: data });
-        toast.success('Order is paid');
-      } catch (err) {
-        dispatch({ type: 'PAY_FAIL', payload: getError(err) });
-        toast.error(getError(err));
-      }
-    });
-  }
-  function onError(err) {
-    toast.error(getError(err));
-  }
+      dispatch({ type: 'FETCH_SUCCESS', payload: data });
+    } catch (err) {
+      dispatch({ type: 'FETCH_FAIL', payload: getError(err) });
+    }
+  };
 
   useEffect(() => {
-    const fetchOrder = async () => {
-      try {
-        dispatch({ type: 'FETCH_REQUEST' });
-        const { data } = await axios.get(`/api/orders/${orderId}`, {
-          headers: { authorization: `Bearer ${userInfo.token}` },
-        });
-        dispatch({ type: 'FETCH_SUCCESS', payload: data });
-      } catch (err) {
-        dispatch({ type: 'FETCH_FAIL', payload: getError(err) });
-      }
-    };
-
-    if (!userInfo) {
-      return navigate('/login');
-    }
-    if (
-      !order._id ||
-      successPay ||
-      successDeliver ||
-      (order._id && order._id !== orderId)
-    ) {
+    if (!userInfo) { navigate('/signin'); return; }
+    if (!order._id || successPay || successDeliver || (order._id && order._id !== orderId)) {
       fetchOrder();
-      if (successPay) {
-        dispatch({ type: 'PAY_RESET' });
-      }
-      if (successDeliver) {
-        dispatch({ type: 'DELIVER_RESET' });
-      }
-    } else {
-      const loadPaypalScript = async () => {
-        const { data: clientId } = await axios.get('/api/keys/paypal', {
-          headers: { authorization: `Bearer ${userInfo.token}` },
-        });
-        paypalDispatch({
-          type: 'resetOptions',
-          value: {
-            'client-id': clientId,
-            currency: 'USD',
-          },
-        });
-        paypalDispatch({ type: 'setLoadingStatus', value: 'pending' });
-      };
-      loadPaypalScript();
+      if (successPay) dispatch({ type: 'PAY_RESET' });
+      if (successDeliver) dispatch({ type: 'DELIVER_RESET' });
     }
-  }, [
-    order,
-    userInfo,
-    orderId,
-    navigate,
-    paypalDispatch,
-    successPay,
-    successDeliver,
-  ]);
+  }, [order, userInfo, orderId, successPay, successDeliver]);
 
-  async function deliverOrderHandler() {
+  const deliverHandler = async () => {
+    dispatch({ type: 'DELIVER_REQUEST' });
     try {
-      dispatch({ type: 'DELIVER_REQUEST' });
-      const { data } = await axios.put(
-        `/api/orders/${order._id}/deliver`,
-        {},
-        {
-          headers: { authorization: `Bearer ${userInfo.token}` },
-        }
-      );
-      dispatch({ type: 'DELIVER_SUCCESS', payload: data });
-      toast.success('Order is delivered');
+      await axios.put(`/api/orders/${order._id}/deliver`, {}, {
+        headers: { authorization: `Bearer ${userInfo.token}` },
+      });
+      dispatch({ type: 'DELIVER_SUCCESS' });
+      toast.success('Order marked as delivered');
     } catch (err) {
-      toast.error(getError(err));
       dispatch({ type: 'DELIVER_FAIL' });
+      toast.error(getError(err));
     }
-  }
+  };
 
-  return loading ? (
-    <LoadingBox></LoadingBox>
-  ) : error ? (
-    <MessageBox variant="danger">{error}</MessageBox>
-  ) : (
-    <div>
-      <Helmet>
-        <title>Order {orderId}</title>
-      </Helmet>
-      <h1 className="my-3">Order {orderId}</h1>
-      <Row>
-        <Col md={8}>
-          <Card className="mb-3">
-            <Card.Body>
-              <Card.Title>Shipping</Card.Title>
-              <Card.Text>
-                <strong>Name:</strong> {order.shippingAddress.fullName} <br />
-                <strong>Address: </strong> {order.shippingAddress.address},
-                {order.shippingAddress.city}, {order.shippingAddress.postalCode}
-                ,{order.shippingAddress.country}
-                &nbsp;
-                {order.shippingAddress.location &&
-                  order.shippingAddress.location.lat && (
-                    <a
-                      target="_new"
-                      href={`https://maps.google.com?q=${order.shippingAddress.location.lat},${order.shippingAddress.location.lng}`}
-                    >
-                      Show On Map
-                    </a>
-                  )}
-              </Card.Text>
-              {order.isDelivered ? (
-                <MessageBox variant="success">
-                  Delivered at {order.deliveredAt}
-                </MessageBox>
-              ) : (
-                <MessageBox variant="danger">Not Delivered</MessageBox>
-              )}
-            </Card.Body>
-          </Card>
-          <Card className="mb-3">
-            <Card.Body>
-              <Card.Title>Payment</Card.Title>
-              <Card.Text>
-                <strong>Method:</strong> {order.paymentMethod}
-              </Card.Text>
-              {order.isPaid ? (
-                <MessageBox variant="success">
-                  Paid at {order.paidAt}
-                </MessageBox>
-              ) : (
-                <MessageBox variant="danger">Not Paid</MessageBox>
-              )}
-            </Card.Body>
-          </Card>
+  if (loading) return <LoadingBox />;
+  if (error) return <MessageBox variant="danger">{error}</MessageBox>;
 
-          <Card className="mb-3">
-            <Card.Body>
-              <Card.Title>Items</Card.Title>
-              <ListGroup variant="flush">
-                {order.orderItems.map((item) => (
-                  <ListGroup.Item key={item._id}>
-                    <Row className="align-items-center">
-                      <Col md={6}>
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="img-fluid rounded img-thumbnail"
-                        ></img>{' '}
-                        <Link to={`/product/${item.slug}`}>{item.name}</Link>
-                      </Col>
-                      <Col md={3}>
-                        <span>{item.quantity}</span>
-                      </Col>
-                      <Col md={3}>${item.price}</Col>
-                    </Row>
-                  </ListGroup.Item>
-                ))}
-              </ListGroup>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col md={4}>
-          <Card className="mb-3">
-            <Card.Body>
-              <Card.Title>Order Summary</Card.Title>
-              <ListGroup variant="flush">
-                <ListGroup.Item>
-                  <Row>
-                    <Col>Items</Col>
-                    <Col>${order.itemsPrice.toFixed(2)}</Col>
-                  </Row>
-                </ListGroup.Item>
-                <ListGroup.Item>
-                  <Row>
-                    <Col>Shipping</Col>
-                    <Col>${order.shippingPrice.toFixed(2)}</Col>
-                  </Row>
-                </ListGroup.Item>
-                <ListGroup.Item>
-                  <Row>
-                    <Col>Tax</Col>
-                    <Col>${order.taxPrice.toFixed(2)}</Col>
-                  </Row>
-                </ListGroup.Item>
-                <ListGroup.Item>
-                  <Row>
-                    <Col>
-                      <strong> Order Total</strong>
-                    </Col>
-                    <Col>
-                      <strong>${order.totalPrice.toFixed(2)}</strong>
-                    </Col>
-                  </Row>
-                </ListGroup.Item>
-                {!order.isPaid && (
-                  <ListGroup.Item>
-                    {isPending ? (
-                      <LoadingBox />
-                    ) : (
-                      <div>
-                        <PayPalButtons
-                          createOrder={createOrder}
-                          onApprove={onApprove}
-                          onError={onError}
-                        ></PayPalButtons>
-                      </div>
-                    )}
-                    {loadingPay && <LoadingBox></LoadingBox>}
-                  </ListGroup.Item>
-                )}
-                {userInfo.isAdmin && order.isPaid && !order.isDelivered && (
-                  <ListGroup.Item>
-                    {loadingDeliver && <LoadingBox></LoadingBox>}
-                    <div className="d-grid">
-                      <Button type="button" onClick={deliverOrderHandler}>
-                        Deliver Order
-                      </Button>
-                    </div>
-                  </ListGroup.Item>
-                )}
-              </ListGroup>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+  return (
+    <div style={{ padding: '28px 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <h1 style={{ fontSize: '1.4rem', fontWeight: 800 }}>
+          Order <span style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: '1rem' }}>#{order._id?.slice(-8).toUpperCase()}</span>
+        </h1>
+        <span className={`badge badge-${order.isPaid ? 'success' : 'warning'}`}>
+          {order.isPaid ? '✓ Paid' : 'Pending Payment'}
+        </span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 24, alignItems: 'start' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Shipping */}
+          <div className="card card-body">
+            <h3 style={{ fontWeight: 700, marginBottom: 12 }}>📦 Shipping</h3>
+            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.8, marginBottom: 10 }}>
+              <strong>{order.shippingAddress?.fullName}</strong><br />
+              {order.shippingAddress?.address}, {order.shippingAddress?.city}<br />
+              {order.shippingAddress?.postalCode}, {order.shippingAddress?.country}
+            </p>
+            {order.isDelivered ? (
+              <MessageBox variant="success">Delivered on {new Date(order.deliveredAt).toLocaleDateString()}</MessageBox>
+            ) : (
+              <MessageBox variant="warning">Not yet delivered</MessageBox>
+            )}
+          </div>
+
+          {/* Payment */}
+          <div className="card card-body">
+            <h3 style={{ fontWeight: 700, marginBottom: 12 }}>💳 Payment</h3>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 10 }}>Method: <strong>{order.paymentMethod}</strong></p>
+            {order.isPaid ? (
+              <MessageBox variant="success">Paid on {new Date(order.paidAt).toLocaleDateString()}</MessageBox>
+            ) : (
+              <MessageBox variant="warning">Awaiting payment</MessageBox>
+            )}
+          </div>
+
+          {/* Items */}
+          <div className="card card-body">
+            <h3 style={{ fontWeight: 700, marginBottom: 14 }}>🛒 Order Items</h3>
+            {order.orderItems?.map((item) => (
+              <div key={item._id} style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+                <img src={item.image} alt={item.name} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 10 }} />
+                <div style={{ flex: 1 }}>
+                  <Link to={`/product/${item.slug}`} style={{ fontWeight: 500, color: 'var(--text-primary)', textDecoration: 'none', fontSize: '0.875rem' }}>{item.name}</Link>
+                </div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>{item.quantity} × ${item.price.toFixed(2)}</span>
+                <strong style={{ minWidth: 70, textAlign: 'right' }}>${(item.quantity * item.price).toFixed(2)}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Summary */}
+        <div className="summary-card">
+          <h3 className="summary-title">Order Summary</h3>
+          <div className="summary-row"><span>Items</span><span>${order.itemsPrice?.toFixed(2)}</span></div>
+          <div className="summary-row"><span>Shipping</span><span>${order.shippingPrice?.toFixed(2)}</span></div>
+          <div className="summary-row"><span>Tax</span><span>${order.taxPrice?.toFixed(2)}</span></div>
+          <div className="summary-row total"><span>Total</span><span>${order.totalPrice?.toFixed(2)}</span></div>
+
+          {!order.isPaid && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                padding: 16,
+                textAlign: 'center',
+                color: 'var(--text-muted)',
+                fontSize: '0.875rem',
+              }}>
+                <i className="fas fa-info-circle" style={{ marginRight: 6 }}></i>
+                Payment integration pending. Contact support to process payment.
+              </div>
+            </div>
+          )}
+
+          {userInfo?.isAdmin && order.isPaid && !order.isDelivered && (
+            <button
+              className="btn btn-success"
+              style={{ width: '100%', justifyContent: 'center', marginTop: 12 }}
+              onClick={deliverHandler}
+              disabled={loadingDeliver}
+              id="deliver-btn"
+            >
+              {loadingDeliver ? 'Processing...' : <><i className="fas fa-truck"></i> Mark as Delivered</>}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

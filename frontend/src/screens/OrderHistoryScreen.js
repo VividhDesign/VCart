@@ -1,23 +1,17 @@
-import React, { useContext, useEffect, useReducer } from 'react';
-import { Helmet } from 'react-helmet-async';
+import { useContext, useEffect, useReducer } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
-import LoadingBox from '../components/LoadingBox';
-import MessageBox from '../components/MessageBox';
 import { Store } from '../Store';
 import { getError } from '../utils';
-import Button from 'react-bootstrap/esm/Button';
+import LoadingBox from '../components/LoadingBox';
+import MessageBox from '../components/MessageBox';
 
 const reducer = (state, action) => {
   switch (action.type) {
-    case 'FETCH_REQUEST':
-      return { ...state, loading: true };
-    case 'FETCH_SUCCESS':
-      return { ...state, orders: action.payload, loading: false };
-    case 'FETCH_FAIL':
-      return { ...state, loading: false, error: action.payload };
-    default:
-      return state;
+    case 'FETCH_REQUEST': return { ...state, loading: true };
+    case 'FETCH_SUCCESS': return { ...state, orders: action.payload, loading: false };
+    case 'FETCH_FAIL': return { ...state, loading: false, error: action.payload };
+    default: return state;
   }
 };
 
@@ -25,80 +19,83 @@ export default function OrderHistoryScreen() {
   const { state } = useContext(Store);
   const { userInfo } = state;
   const navigate = useNavigate();
-
   const [{ loading, error, orders }, dispatch] = useReducer(reducer, {
-    loading: true,
-    error: '',
+    loading: true, error: '', orders: [],
   });
+
   useEffect(() => {
     const fetchData = async () => {
       dispatch({ type: 'FETCH_REQUEST' });
       try {
-        const { data } = await axios.get(
-          `/api/orders/mine`,
-
-          { headers: { Authorization: `Bearer ${userInfo.token}` } }
-        );
-        dispatch({ type: 'FETCH_SUCCESS', payload: data });
-      } catch (error) {
-        dispatch({
-          type: 'FETCH_FAIL',
-          payload: getError(error),
+        const { data } = await axios.get('/api/orders/mine', {
+          headers: { Authorization: `Bearer ${userInfo.token}` },
         });
+        dispatch({ type: 'FETCH_SUCCESS', payload: data });
+      } catch (err) {
+        dispatch({ type: 'FETCH_FAIL', payload: getError(err) });
       }
     };
     fetchData();
   }, [userInfo]);
-  return (
-    <div>
-      <Helmet>
-        <title>Order History</title>
-      </Helmet>
 
-      <h1>Order History</h1>
+  return (
+    <div style={{ padding: '28px 0' }}>
+      <h1 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: 28 }}>My Orders</h1>
       {loading ? (
-        <LoadingBox></LoadingBox>
+        <LoadingBox />
       ) : error ? (
         <MessageBox variant="danger">{error}</MessageBox>
+      ) : orders.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 0' }}>
+          <div style={{ fontSize: '4rem', marginBottom: 16 }}>📋</div>
+          <h3 style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>No orders yet</h3>
+          <Link to="/" className="btn btn-primary">Start Shopping</Link>
+        </div>
       ) : (
-        <table className="table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>DATE</th>
-              <th>TOTAL</th>
-              <th>PAID</th>
-              <th>DELIVERED</th>
-              <th>ACTIONS</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.map((order) => (
-              <tr key={order._id}>
-                <td>{order._id}</td>
-                <td>{order.createdAt.substring(0, 10)}</td>
-                <td>{order.totalPrice.toFixed(2)}</td>
-                <td>{order.isPaid ? order.paidAt.substring(0, 10) : 'No'}</td>
-                <td>
-                  {order.isDelivered
-                    ? order.deliveredAt.substring(0, 10)
-                    : 'No'}
-                </td>
-                <td>
-                  <Button
-                    type="button"
-                    variant="light"
-                    onClick={() => {
-                      navigate(`/order/${order._id}`);
-                    }}
-                  >
-                    Details
-                  </Button>
-                </td>
+        <div className="table-wrapper">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>ORDER ID</th>
+                <th>DATE</th>
+                <th>TOTAL</th>
+                <th>PAID</th>
+                <th>DELIVERED</th>
+                <th>ACTION</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {orders.map((order) => (
+                <tr key={order._id}>
+                  <td style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    #{order._id.slice(-8).toUpperCase()}
+                  </td>
+                  <td>{new Date(order.createdAt).toLocaleDateString()}</td>
+                  <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>${order.totalPrice.toFixed(2)}</td>
+                  <td>
+                    {order.isPaid ? (
+                      <span className="badge badge-success">{new Date(order.paidAt).toLocaleDateString()}</span>
+                    ) : (
+                      <span className="badge badge-warning">Pending</span>
+                    )}
+                  </td>
+                  <td>
+                    {order.isDelivered ? (
+                      <span className="badge badge-success">{new Date(order.deliveredAt).toLocaleDateString()}</span>
+                    ) : (
+                      <span className="badge badge-danger">Not Delivered</span>
+                    )}
+                  </td>
+                  <td>
+                    <button className="btn btn-outline btn-sm" onClick={() => navigate(`/order/${order._id}`)}>
+                      <i className="fas fa-eye"></i> View
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

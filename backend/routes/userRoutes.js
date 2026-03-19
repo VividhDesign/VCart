@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import expressAsyncHandler from 'express-async-handler';
 import jwt from 'jsonwebtoken';
 import User from '../models/userModel.js';
-import { isAuth, isAdmin, generateToken, baseUrl, mailgun } from '../utils.js';
+import { isAuth, isAdmin, generateToken, baseUrl } from '../utils.js';
 
 const userRouter = express.Router();
 
@@ -42,7 +42,6 @@ userRouter.put(
       if (req.body.password) {
         user.password = bcrypt.hashSync(req.body.password, 8);
       }
-
       const updatedUser = await user.save();
       res.send({
         _id: updatedUser._id,
@@ -61,34 +60,15 @@ userRouter.post(
   '/forget-password',
   expressAsyncHandler(async (req, res) => {
     const user = await User.findOne({ email: req.body.email });
-
     if (user) {
       const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, {
         expiresIn: '3h',
       });
       user.resetToken = token;
       await user.save();
-
-      //reset link
-      console.log(`${baseUrl()}/reset-password/${token}`);
-
-      mailgun()
-        .messages()
-        .send(
-          {
-            from: 'Amazona <me@mg.yourdomain.com>',
-            to: `${user.name} <${user.email}>`,
-            subject: `Reset Password`,
-            html: ` 
-             <p>Please Click the following link to reset your password:</p> 
-             <a href="${baseUrl()}/reset-password/${token}"}>Reset Password</a>
-             `,
-          },
-          (error, body) => {
-            console.log(error);
-            console.log(body);
-          }
-        );
+      const resetLink = `${baseUrl()}/reset-password/${token}`;
+      console.log(`📧 Password reset link: ${resetLink}`);
+      // In production, send this via a real email service
       res.send({ message: 'We sent reset password link to your email.' });
     } else {
       res.status(404).send({ message: 'User not found' });
@@ -107,10 +87,9 @@ userRouter.post(
         if (user) {
           if (req.body.password) {
             user.password = bcrypt.hashSync(req.body.password, 8);
+            user.resetToken = undefined;
             await user.save();
-            res.send({
-              message: 'Password reseted successfully',
-            });
+            res.send({ message: 'Password reset successfully' });
           }
         } else {
           res.status(404).send({ message: 'User not found' });
@@ -149,13 +128,14 @@ userRouter.delete(
         res.status(400).send({ message: 'Can Not Delete Admin User' });
         return;
       }
-      await user.remove();
+      await user.deleteOne();
       res.send({ message: 'User Deleted' });
     } else {
       res.status(404).send({ message: 'User Not Found' });
     }
   })
 );
+
 userRouter.post(
   '/signin',
   expressAsyncHandler(async (req, res) => {

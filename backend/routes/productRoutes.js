@@ -18,7 +18,7 @@ productRouter.post(
     const newProduct = new Product({
       name: 'sample name ' + Date.now(),
       slug: 'sample-name-' + Date.now(),
-      image: '/images/p1.jpg',
+      image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500',
       price: 0,
       category: 'sample category',
       brand: 'sample brand',
@@ -26,6 +26,7 @@ productRouter.post(
       rating: 0,
       numReviews: 0,
       description: 'sample description',
+      featured: false,
     });
     const product = await newProduct.save();
     res.send({ message: 'Product Created', product });
@@ -49,6 +50,7 @@ productRouter.put(
       product.brand = req.body.brand;
       product.countInStock = req.body.countInStock;
       product.description = req.body.description;
+      product.featured = req.body.featured || false;
       await product.save();
       res.send({ message: 'Product Updated' });
     } else {
@@ -64,7 +66,7 @@ productRouter.delete(
   expressAsyncHandler(async (req, res) => {
     const product = await Product.findById(req.params.id);
     if (product) {
-      await product.remove();
+      await product.deleteOne();
       res.send({ message: 'Product Deleted' });
     } else {
       res.status(404).send({ message: 'Product Not Found' });
@@ -84,7 +86,6 @@ productRouter.post(
           .status(400)
           .send({ message: 'You already submitted a review' });
       }
-
       const review = {
         name: req.user.name,
         rating: Number(req.body.rating),
@@ -108,7 +109,7 @@ productRouter.post(
   })
 );
 
-const PAGE_SIZE = 3;
+const PAGE_SIZE = 8;
 
 productRouter.get(
   '/admin',
@@ -146,26 +147,16 @@ productRouter.get(
 
     const queryFilter =
       searchQuery && searchQuery !== 'all'
-        ? {
-            name: {
-              $regex: searchQuery,
-              $options: 'i',
-            },
-          }
+        ? { name: { $regex: searchQuery, $options: 'i' } }
         : {};
     const categoryFilter = category && category !== 'all' ? { category } : {};
     const ratingFilter =
       rating && rating !== 'all'
-        ? {
-            rating: {
-              $gte: Number(rating),
-            },
-          }
+        ? { rating: { $gte: Number(rating) } }
         : {};
     const priceFilter =
       price && price !== 'all'
         ? {
-            // 1-50
             price: {
               $gte: Number(price.split('-')[0]),
               $lte: Number(price.split('-')[1]),
@@ -226,6 +217,7 @@ productRouter.get('/slug/:slug', async (req, res) => {
     res.status(404).send({ message: 'Product Not Found' });
   }
 });
+
 productRouter.get('/:id', async (req, res) => {
   const product = await Product.findById(req.params.id);
   if (product) {
