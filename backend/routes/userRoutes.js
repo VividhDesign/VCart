@@ -4,7 +4,7 @@ import expressAsyncHandler from 'express-async-handler';
 import jwt from 'jsonwebtoken';
 import User from '../models/userModel.js';
 import { isAuth, isAdmin, generateToken, baseUrl } from '../utils.js';
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 const userRouter = express.Router();
 
 userRouter.get(
@@ -68,18 +68,12 @@ userRouter.post(
       await user.save();
       const resetLink = `${process.env.FRONTEND_URL}/reset-password/${token}`;
 
-      // --- THE NEW NODEMAILER CODE for mailing---
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS,
-        },
-      });
+      // --- THE NEW RESEND API CODE ---
+      const resend = new Resend(process.env.RESEND_API_KEY);
 
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: user.email,
+      const { data, error } = await resend.emails.send({
+        from: 'onboarding@resend.dev', // This is Resend's default testing address
+        to: user.email, // Make sure this matches the email you signed up to Resend with!
         subject: 'VCart - Password Reset Link',
         html: `
           <h2>Password Reset Request</h2>
@@ -87,18 +81,17 @@ userRouter.post(
           <a href="${resetLink}" style="padding: 10px 20px; background-color: #6c63ff; color: white; text-decoration: none; border-radius: 5px;">Reset Password</a>
           <p>This link is valid for 3 hours.</p>
         `,
-      };
-
-      transporter.sendMail(mailOptions, (error, info) => {
-        if (error) {
-          console.error('Error sending email:', error);
-        } else {
-          console.log('Email sent: ' + info.response);
-        }
       });
+
+      if (error) {
+        console.error('Resend Error:', error);
+        return res.status(500).send({ message: 'Error sending email via API' });
+      }
+
+      console.log('Email successfully sent via Resend API:', data);
+      res.send({ message: 'We sent reset password link to your email.' });
       // -------------------------------
 
-      res.send({ message: 'We sent reset password link to your email.' });
     } else {
       res.status(404).send({ message: 'User not found' });
     }
