@@ -112,8 +112,9 @@ userRouter.post(
 
         if (user) {
           if (req.body.password) {
-            // 3. Hash the new password and save it
+            // 3. Hash the new password, clear the reset token, and save
             user.password = bcrypt.hashSync(req.body.password, 8);
+            user.resetToken = undefined;
             await user.save();
             res.send({ message: 'Password reset successfully' });
           } else {
