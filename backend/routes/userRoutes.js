@@ -100,17 +100,24 @@ userRouter.post(
 userRouter.post(
   '/reset-password',
   expressAsyncHandler(async (req, res) => {
+    // 1. Unlock the token using your secret key
     jwt.verify(req.body.token, process.env.JWT_SECRET, async (err, decode) => {
       if (err) {
-        res.status(401).send({ message: 'Invalid Token' });
+        // If the token is fake, expired, or the secret doesn't match
+        console.error("JWT Error:", err.message);
+        return res.status(401).send({ message: 'Invalid or Expired Token' });
       } else {
-        const user = await User.findOne({ resetToken: req.body.token });
+        // 2. The token is valid! 'decode' now contains the _id we hid inside it
+        const user = await User.findById(decode._id);
+
         if (user) {
           if (req.body.password) {
+            // 3. Hash the new password and save it
             user.password = bcrypt.hashSync(req.body.password, 8);
-            user.resetToken = undefined;
             await user.save();
             res.send({ message: 'Password reset successfully' });
+          } else {
+            res.status(400).send({ message: 'Password is required' });
           }
         } else {
           res.status(404).send({ message: 'User not found' });
