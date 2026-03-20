@@ -4,7 +4,7 @@ import expressAsyncHandler from 'express-async-handler';
 import jwt from 'jsonwebtoken';
 import User from '../models/userModel.js';
 import { isAuth, isAdmin, generateToken, baseUrl } from '../utils.js';
-
+import nodemailer from 'nodemailer';
 const userRouter = express.Router();
 
 userRouter.get(
@@ -66,16 +66,44 @@ userRouter.post(
       });
       user.resetToken = token;
       await user.save();
-      const resetLink = `${baseUrl()}/reset-password/${token}`;
-      console.log(`📧 Password reset link: ${resetLink}`);
-      // In production, send this via a real email service
+      const resetLink = `${process.env.FRONTEND_URL}/reset-password/${token}`;
+
+      // --- THE NEW NODEMAILER CODE for mailing---
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: user.email,
+        subject: 'VCart - Password Reset Link',
+        html: `
+          <h2>Password Reset Request</h2>
+          <p>You requested to reset your password. Click the link below to set a new one:</p>
+          <a href="${resetLink}" style="padding: 10px 20px; background-color: #6c63ff; color: white; text-decoration: none; border-radius: 5px;">Reset Password</a>
+          <p>This link is valid for 3 hours.</p>
+        `,
+      };
+
+      transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+          console.error('Error sending email:', error);
+        } else {
+          console.log('Email sent: ' + info.response);
+        }
+      });
+      // -------------------------------
+
       res.send({ message: 'We sent reset password link to your email.' });
     } else {
       res.status(404).send({ message: 'User not found' });
     }
   })
 );
-
 userRouter.post(
   '/reset-password',
   expressAsyncHandler(async (req, res) => {
