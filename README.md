@@ -162,7 +162,7 @@ This project is licensed under the MIT License — see the [LICENSE](./LICENSE) 
 
 ## 🙏 Acknowledgements
 
-- Inspired by the [MERN Amazona](https://github.com/basir/mern-amazona) project by Basir
+- Inspired by the [MERN Amazona](https://github.com/basir/mern-amazona) project
 - Product images courtesy of [Unsplash](https://unsplash.com)
 - Icons by [Font Awesome](https://fontawesome.com)
 
