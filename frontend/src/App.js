@@ -57,10 +57,18 @@ function NavDropdown({ label, children }) {
 
 function App() {
   const { state, dispatch: ctxDispatch } = useContext(Store);
-  const { cart, userInfo } = state;
+  const { cart, userInfo, darkMode } = state;
   const [sidebarIsOpen, setSidebarIsOpen] = useState(false);
   const [categories, setCategories] = useState([]);
   const [scrolled, setScrolled] = useState(false);
+
+  // Apply theme class to body whenever darkMode changes
+  useEffect(() => {
+    document.body.classList.toggle('dark-mode', darkMode);
+    document.body.classList.toggle('light-mode', !darkMode);
+  }, [darkMode]);
+
+  const toggleDarkMode = () => ctxDispatch({ type: 'TOGGLE_DARK_MODE' });
 
   const signoutHandler = () => {
     ctxDispatch({ type: 'USER_SIGNOUT' });
@@ -112,6 +120,16 @@ function App() {
           <SearchBox />
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 'auto' }}>
+
+            {/* Dark Mode Toggle */}
+            <button
+              onClick={toggleDarkMode}
+              className="theme-toggle-btn"
+              title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              <i className={`fas fa-${darkMode ? 'sun' : 'moon'}`}></i>
+            </button>
+
             <Link to="/cart" className="nav-link-item">
               <i className="fas fa-shopping-cart"></i>
               <span className="d-none d-sm-inline">Cart</span>

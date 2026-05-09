@@ -3,6 +3,7 @@ import React, { createContext, useReducer } from 'react';
 export const Store = createContext();
 
 const initialState = {
+  darkMode: localStorage.getItem('darkMode') === 'true' ? true : false,
   cart: {
     shippingAddress: localStorage.getItem('shippingAddress')
       ? JSON.parse(localStorage.getItem('shippingAddress'))
@@ -69,6 +70,11 @@ function reducer(state, action) {
         ...state,
         cart: { ...state.cart, paymentMethod: action.payload },
       };
+    case 'TOGGLE_DARK_MODE': {
+      const newMode = !state.darkMode;
+      localStorage.setItem('darkMode', newMode);
+      return { ...state, darkMode: newMode };
+    }
     default:
       return state;
   }
